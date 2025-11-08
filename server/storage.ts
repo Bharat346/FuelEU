@@ -29,7 +29,7 @@ export class StorageError extends Error {
 }
 
 export class NotFoundError extends StorageError {
-  constructor(resource: string, id: string | number) {
+  constructor(resource: string, id: string) {
     super(`${resource} with ID ${id} not found`);
     this.name = 'NotFoundError';
   }
@@ -46,11 +46,11 @@ export class ValidationError extends StorageError {
 export interface IStorage {
   // Routes
   getAllRoutes(): Promise<Route[]>;
-  getRouteById(id: number): Promise<Route>;
+  getRouteById(id: string): Promise<Route>;
   getRouteByRouteId(routeId: string): Promise<Route>;
   createRoute(route: InsertRoute): Promise<Route>;
-  updateRoute(id: number, updates: Partial<InsertRoute>): Promise<Route>;
-  deleteRoute(id: number): Promise<void>;
+  updateRoute(id: string, updates: Partial<InsertRoute>): Promise<Route>;
+  deleteRoute(id: string): Promise<void>;
   setBaseline(routeId: string): Promise<void>;
   getBaselineRoute(): Promise<Route | undefined>;
   getRoutesByYear(year: number): Promise<Route[]>;
@@ -59,28 +59,28 @@ export interface IStorage {
   getShipCompliance(shipId: string, year: number): Promise<ShipCompliance | undefined>;
   getShipComplianceHistory(shipId: string, limit?: number): Promise<ShipCompliance[]>;
   createShipCompliance(compliance: InsertShipCompliance): Promise<ShipCompliance>;
-  updateShipCompliance(id: number, updates: Partial<ShipCompliance>): Promise<ShipCompliance>;
-  deleteShipCompliance(id: number): Promise<void>;
+  updateShipCompliance(id: string, updates: Partial<ShipCompliance>): Promise<ShipCompliance>;
+  deleteShipCompliance(id: string): Promise<void>;
 
   // Bank Entries
   getBankEntries(shipId: string, year: number): Promise<BankEntry[]>;
-  getBankEntryById(id: number): Promise<BankEntry>;
+  getBankEntryById(id: string): Promise<BankEntry>;
   createBankEntry(entry: InsertBankEntry): Promise<BankEntry>;
-  updateBankEntry(id: number, updates: Partial<InsertBankEntry>): Promise<BankEntry>;
-  deleteBankEntry(id: number): Promise<void>;
+  updateBankEntry(id: string, updates: Partial<InsertBankEntry>): Promise<BankEntry>;
+  deleteBankEntry(id: string): Promise<void>;
   getTotalBanked(shipId: string, year: number): Promise<number>;
   getBankSummary(shipId: string, startYear: number, endYear: number): Promise<{ year: number; total: number }[]>;
 
   // Pools
   createPool(pool: InsertPool): Promise<Pool>;
-  getPoolById(id: number): Promise<Pool>;
+  getPoolById(id: string): Promise<Pool>;
   getAllPools(): Promise<Pool[]>;
-  updatePool(id: number, updates: Partial<InsertPool>): Promise<Pool>;
-  deletePool(id: number): Promise<void>;
+  updatePool(id: string, updates: Partial<InsertPool>): Promise<Pool>;
+  deletePool(id: string): Promise<void>;
   createPoolMember(member: InsertPoolMember): Promise<PoolMember>;
-  getPoolMembers(poolId: number): Promise<PoolMember[]>;
-  getPoolMemberById(id: number): Promise<PoolMember>;
-  removePoolMember(id: number): Promise<void>;
+  getPoolMembers(poolId: string): Promise<PoolMember[]>;
+  getPoolMemberById(id: string): Promise<PoolMember>;
+  removePoolMember(id: string): Promise<void>;
   getPoolsByShip(shipId: string): Promise<Pool[]>;
 }
 
@@ -95,7 +95,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getRouteById(id: number): Promise<Route> {
+  async getRouteById(id: string): Promise<Route> {
     try {
       const [route] = await db.select().from(routes).where(eq(routes.id, id));
       if (!route) {
@@ -147,7 +147,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateRoute(id: number, updates: Partial<InsertRoute>): Promise<Route> {
+  async updateRoute(id: string, updates: Partial<InsertRoute>): Promise<Route> {
     try {
       const [route] = await db
         .update(routes)
@@ -166,7 +166,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteRoute(id: number): Promise<void> {
+  async deleteRoute(id: string): Promise<void> {
     try {
       const [route] = await db
         .delete(routes)
@@ -232,9 +232,7 @@ export class DatabaseStorage implements IStorage {
       const [compliance] = await db
         .select()
         .from(shipCompliance)
-        .where(and(eq(shipCompliance.shipId, shipId), eq(shipCompliance.year, year)))
-        .orderBy(desc(shipCompliance.createdAt))
-        .limit(1);
+        .where(and(eq(shipCompliance.shipId, shipId), eq(shipCompliance.year, year)));
 
       return compliance || undefined;
     } catch (error) {
@@ -280,7 +278,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateShipCompliance(id: number, updates: Partial<ShipCompliance>): Promise<ShipCompliance> {
+  async updateShipCompliance(id: string, updates: Partial<ShipCompliance>): Promise<ShipCompliance> {
     try {
       const [compliance] = await db
         .update(shipCompliance)
@@ -299,7 +297,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteShipCompliance(id: number): Promise<void> {
+  async deleteShipCompliance(id: string): Promise<void> {
     try {
       const [compliance] = await db
         .delete(shipCompliance)
@@ -328,7 +326,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getBankEntryById(id: number): Promise<BankEntry> {
+  async getBankEntryById(id: string): Promise<BankEntry> {
     try {
       const [entry] = await db.select().from(bankEntries).where(eq(bankEntries.id, id));
       if (!entry) {
@@ -349,9 +347,6 @@ export class DatabaseStorage implements IStorage {
       if (!entry.year || entry.year < 2000 || entry.year > 2100) {
         throw new ValidationError('Valid year is required (2000-2100)');
       }
-      if (!entry.amountGco2eq || entry.amountGco2eq <= 0) {
-        throw new ValidationError('Positive amount is required');
-      }
 
       const [bankEntry] = await db
         .insert(bankEntries)
@@ -369,7 +364,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateBankEntry(id: number, updates: Partial<InsertBankEntry>): Promise<BankEntry> {
+  async updateBankEntry(id: string, updates: Partial<InsertBankEntry>): Promise<BankEntry> {
     try {
       const [entry] = await db
         .update(bankEntries)
@@ -388,7 +383,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteBankEntry(id: number): Promise<void> {
+  async deleteBankEntry(id: string): Promise<void> {
     try {
       const [entry] = await db
         .delete(bankEntries)
@@ -439,8 +434,8 @@ export class DatabaseStorage implements IStorage {
   // Pools
   async createPool(pool: InsertPool): Promise<Pool> {
     try {
-      if (!pool.name?.trim()) {
-        throw new ValidationError('Pool name is required');
+      if (!pool.year || pool.year < 2000 || pool.year > 2100) {
+        throw new ValidationError('Valid year is required (2000-2100)');
       }
 
       const [newPool] = await db
@@ -459,7 +454,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPoolById(id: number): Promise<Pool> {
+  async getPoolById(id: string): Promise<Pool> {
     try {
       const [pool] = await db.select().from(pools).where(eq(pools.id, id));
       if (!pool) {
@@ -474,13 +469,13 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPools(): Promise<Pool[]> {
     try {
-      return await db.select().from(pools).orderBy(pools.createdAt);
+      return await db.select().from(pools).orderBy(pools.year, pools.createdAt);
     } catch (error) {
       throw new StorageError('Failed to fetch pools', error);
     }
   }
 
-  async updatePool(id: number, updates: Partial<InsertPool>): Promise<Pool> {
+  async updatePool(id: string, updates: Partial<InsertPool>): Promise<Pool> {
     try {
       const [pool] = await db
         .update(pools)
@@ -499,11 +494,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deletePool(id: number): Promise<void> {
+  async deletePool(id: string): Promise<void> {
     try {
-      // First delete pool members to maintain referential integrity
-      await db.delete(poolMembers).where(eq(poolMembers.poolId, id));
-
+      // Pool members will be automatically deleted due to onDelete: Cascade
       const [pool] = await db
         .delete(pools)
         .where(eq(pools.id, id))
@@ -546,7 +539,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPoolMembers(poolId: number): Promise<PoolMember[]> {
+  async getPoolMembers(poolId: string): Promise<PoolMember[]> {
     try {
       return await db
         .select()
@@ -558,7 +551,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPoolMemberById(id: number): Promise<PoolMember> {
+  async getPoolMemberById(id: string): Promise<PoolMember> {
     try {
       const [member] = await db.select().from(poolMembers).where(eq(poolMembers.id, id));
       if (!member) {
@@ -571,7 +564,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async removePoolMember(id: number): Promise<void> {
+  async removePoolMember(id: string): Promise<void> {
     try {
       const [member] = await db
         .delete(poolMembers)
@@ -592,15 +585,13 @@ export class DatabaseStorage implements IStorage {
       return await db
         .select({
           id: pools.id,
-          name: pools.name,
-          description: pools.description,
-          createdAt: pools.createdAt,
-          updatedAt: pools.updatedAt
+          year: pools.year,
+          createdAt: pools.createdAt
         })
         .from(pools)
         .innerJoin(poolMembers, eq(pools.id, poolMembers.poolId))
         .where(eq(poolMembers.shipId, shipId))
-        .orderBy(pools.createdAt);
+        .orderBy(pools.year, pools.createdAt);
     } catch (error) {
       throw new StorageError(`Failed to fetch pools for ship ${shipId}`, error);
     }

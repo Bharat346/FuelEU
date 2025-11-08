@@ -1,5 +1,4 @@
-// Database connection setup using Drizzle ORM with Neon PostgreSQL
-// Reference: javascript_database integration blueprint
+// db.ts - Use Neon serverless driver for migrations
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
@@ -16,5 +15,21 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+// Use Pool for migrations and complex operations
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  max: 1, // Use single connection for migrations
+});
+
+export const db = drizzle(pool, { schema });
+
+// Helper function for raw SQL execution
+export async function executeSQL(query: string) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(query);
+    return result;
+  } finally {
+    client.release();
+  }
+}
